@@ -1,0 +1,1766 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OSS 117 - Final Soundboard (BPM Sync)</title>
+    <script src="https://unpkg.com/wavesurfer.js@7"></script>
+    <script src="https://unpkg.com/wavesurfer.js@7/dist/plugins/regions.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1e3a8a 0%, #7c3aed 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1800px;
+            margin: 0 auto;
+        }
+
+        header {
+            text-align: center;
+            color: white;
+            margin-bottom: 20px;
+            padding: 30px 20px;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 15px;
+            backdrop-filter: blur(10px);
+        }
+
+        h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+        }
+
+        .bpm-panel {
+            background: rgba(255, 255, 255, 0.98);
+            padding: 15px;
+            border-radius: 12px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            backdrop-filter: blur(10px);
+        }
+
+        .bpm-controls {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+            justify-content: center;
+            flex-wrap: wrap;
+            margin-bottom: 10px;
+        }
+
+        .bpm-metrics {
+            background: rgba(0, 0, 0, 0.05);
+            border-radius: 10px;
+            padding: 12px;
+            margin-top: 12px;
+            display: none;
+        }
+
+        .bpm-metrics.active {
+            display: block;
+        }
+
+        .metrics-row {
+            display: grid;
+            grid-template-columns: auto 1fr auto;
+            gap: 12px;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 8px;
+        }
+
+        .metric-box {
+            background: white;
+            border-radius: 6px;
+            padding: 8px;
+            text-align: center;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        .metric-label {
+            font-size: 0.65em;
+            color: #666;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 3px;
+        }
+
+        .metric-value {
+            font-size: 1.3em;
+            font-weight: bold;
+            color: #8b5cf6;
+        }
+
+        .beat-indicator {
+            width: 35px;
+            height: 35px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #8b5cf6, #7c3aed);
+            margin: 0 auto 3px;
+            transition: transform 0.1s ease, box-shadow 0.1s ease;
+            box-shadow: 0 4px 12px rgba(139, 92, 246, 0.3);
+        }
+
+        .beat-indicator.pulse {
+            transform: scale(1.3);
+            box-shadow: 0 6px 24px rgba(139, 92, 246, 0.8);
+        }
+
+        .meters-container {
+            background: white;
+            border-radius: 8px;
+            padding: 10px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .meter-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .meter-label {
+            font-size: 0.7em;
+            color: #666;
+            font-weight: 600;
+            min-width: 60px;
+        }
+
+        .level-bar-container {
+            flex: 1;
+            height: 20px;
+            background: #e5e7eb;
+            border-radius: 10px;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .level-bar {
+            height: 100%;
+            background: linear-gradient(90deg, #10b981, #fbbf24, #ef4444);
+            width: 0%;
+            transition: width 0.1s ease;
+            border-radius: 10px;
+        }
+
+        .confidence-bar-container {
+            flex: 1;
+            height: 20px;
+            background: #e5e7eb;
+            border-radius: 10px;
+            overflow: hidden;
+        }
+
+        .confidence-bar {
+            height: 100%;
+            background: linear-gradient(90deg, #ef4444, #fbbf24, #10b981);
+            width: 0%;
+            transition: width 0.3s ease;
+            border-radius: 10px;
+        }
+
+        .bpm-history {
+            display: flex;
+            gap: 3px;
+            justify-content: center;
+            align-items: flex-end;
+            height: 35px;
+            padding: 8px;
+            background: white;
+            border-radius: 6px;
+            min-width: 140px;
+        }
+
+        .bpm-history-bar {
+            width: 10px;
+            background: linear-gradient(180deg, #8b5cf6, #a78bfa);
+            border-radius: 2px;
+            transition: height 0.3s ease;
+        }
+
+        .beat-tracker {
+            background: white;
+            border-radius: 8px;
+            padding: 10px;
+        }
+
+        .beat-grid {
+            display: flex;
+            gap: 8px;
+            justify-content: center;
+        }
+
+        .beat-box {
+            width: 50px;
+            height: 50px;
+            background: #e5e7eb;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5em;
+            font-weight: bold;
+            color: #666;
+            transition: all 0.1s ease;
+            border: 2px solid transparent;
+        }
+
+        .beat-box.active {
+            background: linear-gradient(135deg, #8b5cf6, #7c3aed);
+            color: white;
+            transform: scale(1.1);
+            border-color: #6d28d9;
+            box-shadow: 0 4px 12px rgba(139, 92, 246, 0.6);
+        }
+
+        .loop-offset-control {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+            margin-top: 10px;
+            padding: 10px;
+            background: rgba(0, 0, 0, 0.05);
+            border-radius: 8px;
+        }
+
+        .offset-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .offset-slider-container {
+            position: relative;
+            padding: 10px 0;
+        }
+
+        .offset-slider {
+            width: 100%;
+            height: 8px;
+            -webkit-appearance: none;
+            appearance: none;
+            background: linear-gradient(90deg,
+                #8b5cf6 0%, #8b5cf6 12.5%,
+                #7e3aed 12.5%, #7e3aed 25%,
+                #7c3aed 25%, #7c3aed 37.5%,
+                #7028d9 37.5%, #7028d9 50%,
+                #6d28d9 50%, #6d28d9 62.5%,
+                #6324c6 62.5%, #6324c6 75%,
+                #5b21b6 75%, #5b21b6 87.5%,
+                #521fa8 87.5%, #521fa8 100%
+            );
+            border-radius: 10px;
+            outline: none;
+            cursor: pointer;
+        }
+
+        .offset-slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 20px;
+            height: 20px;
+            background: white;
+            border: 3px solid #8b5cf6;
+            border-radius: 50%;
+            cursor: pointer;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+            transition: transform 0.1s ease;
+        }
+
+        .offset-slider::-webkit-slider-thumb:hover {
+            transform: scale(1.1);
+        }
+
+        .offset-slider::-moz-range-thumb {
+            width: 20px;
+            height: 20px;
+            background: white;
+            border: 3px solid #8b5cf6;
+            border-radius: 50%;
+            cursor: pointer;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+            transition: transform 0.1s ease;
+        }
+
+        .offset-slider::-moz-range-thumb:hover {
+            transform: scale(1.1);
+        }
+
+        .beat-markers {
+            display: flex;
+            justify-content: space-between;
+            padding: 0 12px;
+            margin-top: 5px;
+        }
+
+        .beat-marker {
+            font-size: 0.7em;
+            color: #8b5cf6;
+            font-weight: bold;
+            flex: 1;
+            text-align: center;
+        }
+
+        .beat-marker:nth-child(even) {
+            opacity: 0.6;
+            font-size: 0.6em;
+        }
+
+        .offset-label {
+            font-size: 0.75em;
+            color: #666;
+            font-weight: bold;
+        }
+
+        .offset-value {
+            font-size: 0.85em;
+            color: #8b5cf6;
+            font-weight: bold;
+        }
+
+        .bpm-display {
+            background: linear-gradient(135deg, #8b5cf6, #7c3aed);
+            color: white;
+            padding: 12px 24px;
+            border-radius: 12px;
+            font-size: 1.5em;
+            font-weight: bold;
+            min-width: 140px;
+            text-align: center;
+            box-shadow: 0 4px 12px rgba(139, 92, 246, 0.4);
+        }
+
+        .bpm-value {
+            font-size: 1.4em;
+        }
+
+        .bpm-label {
+            font-size: 0.5em;
+            opacity: 0.9;
+            margin-top: 3px;
+        }
+
+        .control-btn {
+            padding: 10px 20px;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 20px;
+            cursor: pointer;
+            font-size: 0.9em;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
+        }
+
+        .control-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 12px rgba(0, 0, 0, 0.3);
+        }
+
+        .control-btn.active {
+            background: #10b981;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+        }
+
+        .control-btn.recording {
+            background: #ef4444;
+        }
+
+        .bpm-input-group {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+
+        .bpm-input-group label {
+            font-size: 0.85em;
+            font-weight: 600;
+        }
+
+        .bpm-input {
+            width: 80px;
+            padding: 8px;
+            font-size: 1em;
+            border: 2px solid #667eea;
+            border-radius: 8px;
+            text-align: center;
+        }
+
+        .status-info {
+            text-align: center;
+            color: #666;
+            font-size: 0.85em;
+            margin-top: 8px;
+            margin-bottom: 0;
+        }
+
+        .status-info.active {
+            color: #10b981;
+            font-weight: 600;
+        }
+
+        .status-info.error {
+            color: #ef4444;
+        }
+
+        .sequencer-container {
+            background: white;
+            padding: 20px;
+            border-radius: 12px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        .sequencer-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+
+        .sequencer-title {
+            font-size: 1.2em;
+            font-weight: bold;
+            color: #333;
+        }
+
+        .sequencer-controls {
+            display: flex;
+            gap: 10px;
+        }
+
+        .seq-btn {
+            padding: 8px 16px;
+            background: #8b5cf6;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 0.9em;
+            font-weight: 600;
+            transition: all 0.2s;
+        }
+
+        .seq-btn:hover {
+            background: #7c3aed;
+            transform: translateY(-1px);
+        }
+
+        .seq-btn.playing {
+            background: #10b981;
+            animation: pulse-seq 1s infinite;
+        }
+
+        @keyframes pulse-seq {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
+        }
+
+        .timeline {
+            display: grid;
+            grid-template-columns: 150px repeat(16, 1fr);
+            gap: 2px;
+            margin-bottom: 20px;
+        }
+
+        .timeline-header {
+            display: contents;
+        }
+
+        .measure-label {
+            grid-column: span 1;
+            text-align: center;
+            font-size: 0.8em;
+            font-weight: bold;
+            color: #8b5cf6;
+            padding: 8px 0;
+            background: rgba(139, 92, 246, 0.1);
+            border-radius: 4px;
+        }
+
+        .beat-label {
+            text-align: center;
+            font-size: 0.7em;
+            font-weight: 600;
+            color: #666;
+            padding: 5px;
+            background: #f3f4f6;
+            border-radius: 4px;
+        }
+
+        .beat-label.downbeat {
+            background: rgba(139, 92, 246, 0.2);
+            color: #8b5cf6;
+        }
+
+        .track-row {
+            display: contents;
+        }
+
+        .track-label {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px;
+            background: #f9fafb;
+            border-radius: 4px;
+            font-size: 0.85em;
+            font-weight: 500;
+            color: #333;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .track-color {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            flex-shrink: 0;
+        }
+
+        .step-cell {
+            aspect-ratio: 1;
+            border: 2px solid #e5e7eb;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            position: relative;
+            background: white;
+        }
+
+        .step-cell:hover {
+            border-color: #8b5cf6;
+            transform: scale(1.05);
+        }
+
+        .step-cell.active {
+            background: linear-gradient(135deg, #8b5cf6, #7c3aed);
+            border-color: #6d28d9;
+            box-shadow: 0 2px 8px rgba(139, 92, 246, 0.4);
+        }
+
+        .step-cell.playing {
+            animation: step-pulse 0.3s ease;
+            box-shadow: 0 0 20px rgba(139, 92, 246, 0.8);
+        }
+
+        @keyframes step-pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.15); }
+            100% { transform: scale(1); }
+        }
+
+        .step-cell.current-beat {
+            border-color: #10b981;
+            border-width: 3px;
+        }
+
+        .playhead {
+            position: absolute;
+            top: 0;
+            width: 3px;
+            height: 100%;
+            background: #10b981;
+            z-index: 10;
+            pointer-events: none;
+            box-shadow: 0 0 10px rgba(16, 185, 129, 0.6);
+        }
+
+        .soundboard {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(400px, 1fr));
+            gap: 20px;
+            margin-bottom: 40px;
+        }
+
+        .sound-card {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            transition: all 0.3s ease;
+            position: relative;
+            border: 3px solid transparent;
+        }
+
+        .sound-card:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);
+        }
+
+        .sound-card.playing {
+            border-color: #10b981;
+            box-shadow: 0 6px 20px rgba(16, 185, 129, 0.3);
+        }
+
+        .sound-card.synced {
+            border-color: #8b5cf6;
+            box-shadow: 0 6px 20px rgba(139, 92, 246, 0.4);
+        }
+
+        .sound-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: start;
+            margin-bottom: 15px;
+        }
+
+        .sound-number {
+            background: #8b5cf6;
+            color: white;
+            min-width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 0.9em;
+            flex-shrink: 0;
+        }
+
+        .sound-title {
+            flex: 1;
+            font-size: 0.95em;
+            line-height: 1.4;
+            padding: 0 15px;
+            color: #333;
+        }
+
+        .delete-btn {
+            background: #ef4444;
+            color: white;
+            border: none;
+            padding: 6px 12px;
+            border-radius: 15px;
+            cursor: pointer;
+            font-size: 0.8em;
+            transition: all 0.2s;
+        }
+
+        .delete-btn:hover {
+            background: #dc2626;
+            transform: scale(1.05);
+        }
+
+        .waveform-container {
+            margin: 15px 0;
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 15px;
+            cursor: pointer;
+            position: relative;
+            min-height: 100px;
+            border: 2px solid transparent;
+            transition: all 0.2s ease;
+        }
+
+        .waveform-container:hover {
+            background: #f0f2f5;
+            border-color: #8b5cf6;
+        }
+
+        .waveform {
+            height: 70px;
+        }
+
+        .loop-region {
+            position: absolute;
+            top: 15px;
+            left: 15px;
+            right: 15px;
+            height: 70px;
+            background: rgba(139, 92, 246, 0.2);
+            border-left: 3px solid #8b5cf6;
+            border-right: 3px solid #8b5cf6;
+            pointer-events: none;
+        }
+
+        .time-display {
+            font-size: 0.85em;
+            color: #666;
+            text-align: center;
+            margin-top: 8px;
+            font-family: 'Courier New', monospace;
+        }
+
+        .sound-meta {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 0.8em;
+            color: #666;
+            margin-top: 12px;
+            padding-top: 12px;
+            border-top: 1px solid #eee;
+        }
+
+        .sync-indicator {
+            background: linear-gradient(135deg, #8b5cf6, #7c3aed);
+            color: white;
+            padding: 4px 12px;
+            border-radius: 15px;
+            font-size: 0.75em;
+            font-weight: bold;
+            display: none;
+        }
+
+        .sound-card.synced .sync-indicator {
+            display: block;
+        }
+
+        .empty-state {
+            text-align: center;
+            color: white;
+            padding: 60px 20px;
+            font-size: 1.2em;
+        }
+
+        .empty-state a {
+            color: #fbbf24;
+            text-decoration: underline;
+        }
+
+        .back-link {
+            position: fixed;
+            top: 30px;
+            left: 30px;
+            background: rgba(255, 255, 255, 0.9);
+            color: #667eea;
+            padding: 12px 24px;
+            border-radius: 25px;
+            text-decoration: none;
+            font-weight: 600;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+            transition: all 0.3s ease;
+            z-index: 999;
+        }
+
+        .back-link:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 16px rgba(0, 0, 0, 0.3);
+        }
+
+        footer {
+            text-align: center;
+            color: white;
+            padding: 20px;
+            opacity: 0.9;
+        }
+
+        @media (max-width: 768px) {
+            h1 {
+                font-size: 1.8em;
+            }
+
+            .soundboard {
+                grid-template-columns: 1fr;
+            }
+
+            .bpm-controls {
+                flex-direction: column;
+            }
+
+            .metrics-row {
+                grid-template-columns: 1fr;
+            }
+
+            .metrics-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+    </style>
+</head>
+<body>
+    <a href="soundboard.html" class="back-link">← Retour</a>
+
+    <div class="container">
+        <header>
+            <h1>🎵 Final Soundboard</h1>
+            <p style="opacity: 0.9;">Loops sauvegardés avec synchronisation BPM</p>
+        </header>
+
+        <div class="bpm-panel">
+            <div class="bpm-controls">
+                <div class="bpm-display">
+                    <div class="bpm-value" id="bpmValue">-- </div>
+                    <div class="bpm-label">BPM</div>
+                </div>
+
+                <button class="control-btn" id="micBtn" onclick="toggleMicrophone()">
+                    🎤 Démarrer détection
+                </button>
+
+                <div class="bpm-input-group">
+                    <label>BPM Manuel:</label>
+                    <input type="number" class="bpm-input" id="manualBpm" value="120" min="60" max="200">
+                    <button class="control-btn" onclick="setManualBpm()">Définir</button>
+                </div>
+
+                <button class="control-btn" onclick="clearAllSaved()">
+                    🗑️ Tout effacer
+                </button>
+            </div>
+
+            <div class="status-info" id="statusInfo">
+                Cliquez sur "Démarrer détection" pour détecter le BPM via micro, ou entrez un BPM manuellement
+            </div>
+
+            <div class="bpm-metrics" id="bpmMetrics">
+                <div class="metrics-row">
+                    <div class="beat-tracker">
+                        <div class="beat-grid">
+                            <div class="beat-box" id="beat-1">1</div>
+                            <div class="beat-box" id="beat-2">2</div>
+                            <div class="beat-box" id="beat-3">3</div>
+                            <div class="beat-box" id="beat-4">4</div>
+                        </div>
+                    </div>
+
+                    <div class="meters-container">
+                        <div class="meter-row">
+                            <span class="meter-label">Audio</span>
+                            <div class="level-bar-container">
+                                <div class="level-bar" id="audioLevelBar"></div>
+                            </div>
+                        </div>
+                        <div class="meter-row">
+                            <span class="meter-label">Confiance</span>
+                            <div class="confidence-bar-container">
+                                <div class="confidence-bar" id="confidenceBar"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="bpm-history" id="bpmHistory">
+                        <div class="bpm-history-bar" style="height: 0%"></div>
+                        <div class="bpm-history-bar" style="height: 0%"></div>
+                        <div class="bpm-history-bar" style="height: 0%"></div>
+                        <div class="bpm-history-bar" style="height: 0%"></div>
+                        <div class="bpm-history-bar" style="height: 0%"></div>
+                        <div class="bpm-history-bar" style="height: 0%"></div>
+                        <div class="bpm-history-bar" style="height: 0%"></div>
+                        <div class="bpm-history-bar" style="height: 0%"></div>
+                        <div class="bpm-history-bar" style="height: 0%"></div>
+                        <div class="bpm-history-bar" style="height: 0%"></div>
+                    </div>
+                </div>
+
+                <div class="metrics-grid">
+                    <div class="metric-box">
+                        <div class="beat-indicator" id="beatIndicator"></div>
+                        <div class="metric-label">Pulse</div>
+                    </div>
+
+                    <div class="metric-box">
+                        <div class="metric-label">Peaks</div>
+                        <div class="metric-value" id="peakCount">0</div>
+                    </div>
+
+                    <div class="metric-box">
+                        <div class="metric-label">Intervalle</div>
+                        <div class="metric-value" id="avgInterval">--</div>
+                    </div>
+
+                    <div class="metric-box">
+                        <div class="metric-label">Dernière</div>
+                        <div class="metric-value" id="lastMeasure">--</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="sequencer-container" id="sequencerContainer" style="display: none;">
+            <div class="sequencer-header">
+                <div class="sequencer-title">🎹 Séquenceur - 4 Mesures</div>
+                <div class="sequencer-controls">
+                    <button class="seq-btn" id="seqPlayBtn" onclick="toggleSequencer()">▶ Play</button>
+                    <button class="seq-btn" onclick="clearSequencer()">🗑️ Clear</button>
+                </div>
+            </div>
+            <div id="timeline" class="timeline">
+                <!-- Timeline will be generated here -->
+            </div>
+        </div>
+
+        <div id="soundboard" class="soundboard">
+            <!-- Sound cards will be generated here -->
+        </div>
+
+        <div id="emptyState" class="empty-state" style="display: none;">
+            <p>📭 Aucun loop sauvegardé</p>
+            <p style="margin-top: 20px;">
+                <a href="soundboard.html">Retournez au soundboard principal</a> pour créer et sauvegarder des loops!
+            </p>
+        </div>
+
+        <footer>
+            <p style="font-size: 0.9em; opacity: 0.85;">
+                💡 Les loops sont synchronisés au BPM détecté automatiquement
+            </p>
+        </footer>
+    </div>
+
+    <script type="module">
+        import WaveSurfer from 'https://unpkg.com/wavesurfer.js@7/dist/wavesurfer.esm.js'
+
+        let savedLoops = JSON.parse(localStorage.getItem('oss117-saved-loops') || '[]');
+        let wavesurfers = {};
+        let currentBPM = 120;
+        let smoothedBPM = 120;
+        let isBPMSynced = false;
+        let micStream = null;
+        let audioContext = null;
+        let analyser = null;
+        let bpmDetectionInterval = null;
+        let beatTrackerInterval = null;
+        let beatPhaseStartTime = null;
+        let loopOffsets = {}; // Store offset percentage for each loop
+        const BPM_SMOOTHING_FACTOR = 0.2; // Lower = more smoothing (0.2 = aggressive smoothing)
+
+        // Sequencer state
+        let sequencerGrid = {}; // {trackIdx: [0,0,1,0, ...]} 16 steps per track
+        let sequencerPlaying = false;
+        let sequencerInterval = null;
+        let currentStep = 0;
+        const trackColors = [
+            '#8b5cf6', '#7c3aed', '#6d28d9', '#5b21b6', '#4c1d95',
+            '#10b981', '#059669', '#047857', '#065f46', '#064e3b',
+            '#f59e0b', '#d97706', '#b45309', '#92400e', '#78350f',
+            '#ef4444', '#dc2626', '#b91c1c', '#991b1b', '#7f1d1d'
+        ];
+
+        // Initialize
+        if (savedLoops.length === 0) {
+            document.getElementById('emptyState').style.display = 'block';
+        } else {
+            initSoundboard();
+        }
+
+        function formatDuration(seconds) {
+            if (!seconds) return '0:00';
+            const mins = Math.floor(seconds / 60);
+            const secs = Math.floor(seconds % 60);
+            return `${mins}:${secs.toString().padStart(2, '0')}`;
+        }
+
+        function initSoundboard() {
+            const soundboard = document.getElementById('soundboard');
+            soundboard.innerHTML = '';
+
+            savedLoops.forEach((loop, idx) => {
+                const card = createSoundCard(loop, idx);
+                soundboard.appendChild(card);
+                // Initialize sequencer track for this loop
+                sequencerGrid[idx] = new Array(16).fill(0);
+            });
+
+            // Show and initialize sequencer
+            if (savedLoops.length > 0) {
+                document.getElementById('sequencerContainer').style.display = 'block';
+                initSequencer();
+            }
+        }
+
+        function initSequencer() {
+            const timeline = document.getElementById('timeline');
+            timeline.innerHTML = '';
+
+            // Create header row
+            const headerRow = document.createElement('div');
+            headerRow.className = 'timeline-header';
+
+            // Empty cell for track labels column
+            const emptyCell = document.createElement('div');
+            emptyCell.className = 'measure-label';
+            headerRow.appendChild(emptyCell);
+
+            // Beat labels (1-4 for each of 4 measures)
+            for (let measure = 0; measure < 4; measure++) {
+                for (let beat = 1; beat <= 4; beat++) {
+                    const beatLabel = document.createElement('div');
+                    beatLabel.className = 'beat-label' + (beat === 1 ? ' downbeat' : '');
+                    beatLabel.textContent = `${measure + 1}.${beat}`;
+                    headerRow.appendChild(beatLabel);
+                }
+            }
+
+            timeline.appendChild(headerRow);
+
+            // Create track rows
+            savedLoops.forEach((loop, idx) => {
+                const trackRow = document.createElement('div');
+                trackRow.className = 'track-row';
+
+                // Track label
+                const trackLabel = document.createElement('div');
+                trackLabel.className = 'track-label';
+                trackLabel.innerHTML = `
+                    <div class="track-color" style="background: ${trackColors[idx % trackColors.length]}"></div>
+                    <span>${cleanTitle(loop.title)}</span>
+                `;
+                trackRow.appendChild(trackLabel);
+
+                // Step cells (16 steps = 4 measures x 4 beats)
+                for (let step = 0; step < 16; step++) {
+                    const stepCell = document.createElement('div');
+                    stepCell.className = 'step-cell';
+                    stepCell.dataset.track = idx;
+                    stepCell.dataset.step = step;
+                    stepCell.onclick = () => toggleStep(idx, step);
+                    trackRow.appendChild(stepCell);
+                }
+
+                timeline.appendChild(trackRow);
+            });
+        }
+
+        function cleanTitle(title) {
+            return title.length > 30 ? title.substring(0, 30) + '...' : title;
+        }
+
+        function toggleStep(trackIdx, step) {
+            sequencerGrid[trackIdx][step] = sequencerGrid[trackIdx][step] ? 0 : 1;
+            updateStepVisual(trackIdx, step);
+        }
+
+        function updateStepVisual(trackIdx, step) {
+            const cell = document.querySelector(`.step-cell[data-track="${trackIdx}"][data-step="${step}"]`);
+            if (cell) {
+                if (sequencerGrid[trackIdx][step]) {
+                    cell.classList.add('active');
+                    cell.style.background = trackColors[trackIdx % trackColors.length];
+                } else {
+                    cell.classList.remove('active');
+                    cell.style.background = '';
+                }
+            }
+        }
+
+        window.toggleSequencer = function() {
+            if (sequencerPlaying) {
+                stopSequencer();
+            } else {
+                startSequencer();
+            }
+        }
+
+        function startSequencer() {
+            if (!isBPMSynced) {
+                alert('Veuillez d\'abord détecter ou définir un BPM!');
+                return;
+            }
+
+            sequencerPlaying = true;
+            currentStep = 0;
+            document.getElementById('seqPlayBtn').textContent = '⏸ Pause';
+            document.getElementById('seqPlayBtn').classList.add('playing');
+
+            playSequencerStep();
+        }
+
+        function stopSequencer() {
+            sequencerPlaying = false;
+            if (sequencerInterval) {
+                clearTimeout(sequencerInterval);
+                sequencerInterval = null;
+            }
+            document.getElementById('seqPlayBtn').textContent = '▶ Play';
+            document.getElementById('seqPlayBtn').classList.remove('playing');
+
+            // Stop all playing sounds
+            Object.values(wavesurfers).forEach(({ws}) => {
+                if (ws && ws.isPlaying()) {
+                    ws.pause();
+                }
+            });
+
+            // Remove current step highlight
+            document.querySelectorAll('.step-cell.current-beat').forEach(cell => {
+                cell.classList.remove('current-beat');
+            });
+        }
+
+        function playSequencerStep() {
+            if (!sequencerPlaying) return;
+
+            // Remove previous step highlight
+            document.querySelectorAll('.step-cell.current-beat').forEach(cell => {
+                cell.classList.remove('current-beat');
+            });
+
+            // Highlight current step
+            document.querySelectorAll(`.step-cell[data-step="${currentStep}"]`).forEach(cell => {
+                cell.classList.add('current-beat');
+            });
+
+            // Play all active tracks at this step
+            Object.keys(sequencerGrid).forEach(trackIdx => {
+                if (sequencerGrid[trackIdx][currentStep]) {
+                    const item = wavesurfers[trackIdx];
+                    if (item) {
+                        const {ws, loop} = item;
+
+                        // Trigger playing animation
+                        const cell = document.querySelector(`.step-cell[data-track="${trackIdx}"][data-step="${currentStep}"]`);
+                        if (cell) {
+                            cell.classList.add('playing');
+                            setTimeout(() => cell.classList.remove('playing'), 300);
+                        }
+
+                        // Play the sound
+                        ws.stop();
+                        ws.setTime(loop.loopStart);
+                        ws.play();
+                        console.log(`[SEQ] Playing track ${trackIdx} at step ${currentStep}`);
+                    }
+                }
+            });
+
+            // Move to next step
+            currentStep = (currentStep + 1) % 16;
+
+            // Schedule next step based on BPM
+            const beatDuration = (60 / currentBPM) * 1000; // milliseconds per beat
+            sequencerInterval = setTimeout(() => playSequencerStep(), beatDuration);
+        }
+
+        window.clearSequencer = function() {
+            if (!confirm('Effacer toutes les notes du séquenceur?')) return;
+
+            Object.keys(sequencerGrid).forEach(trackIdx => {
+                sequencerGrid[trackIdx] = new Array(16).fill(0);
+                for (let step = 0; step < 16; step++) {
+                    updateStepVisual(trackIdx, step);
+                }
+            });
+        }
+
+        function createSoundCard(loop, idx) {
+            const card = document.createElement('div');
+            card.className = 'sound-card';
+            card.id = `card-${idx}`;
+
+            const loopDuration = loop.loopEnd - loop.loopStart;
+
+            card.innerHTML = `
+                <div class="sound-header">
+                    <div class="sound-number">${loop.index}</div>
+                    <div class="sound-title">${loop.title}</div>
+                    <button class="delete-btn" onclick="deleteSavedLoop(${idx})">🗑️</button>
+                </div>
+                <div class="waveform-container" onclick="playLoop(${idx})">
+                    <div class="waveform" id="waveform-${idx}"></div>
+                    <div class="time-display" id="time-${idx}">
+                        Loop: ${formatDuration(loop.loopStart)} → ${formatDuration(loop.loopEnd)} (${formatDuration(loopDuration)})
+                    </div>
+                </div>
+                <div class="sound-meta">
+                    <span>⏱️ ${formatDuration(loopDuration)}</span>
+                    <div class="sync-indicator">🎵 SYNCED</div>
+                    <span id="rate-${idx}" style="font-family: monospace; font-weight: bold;">1.00x</span>
+                    <span>Original: #${loop.index}</span>
+                </div>
+                <div class="loop-offset-control">
+                    <div class="offset-header">
+                        <span class="offset-label">Départ sur:</span>
+                        <span class="offset-value" id="offset-value-${idx}">Temps 1</span>
+                    </div>
+                    <div class="offset-slider-container">
+                        <input type="range" class="offset-slider" id="offset-${idx}"
+                               min="0" max="7" value="0" step="1"
+                               oninput="updateLoopOffset(${idx}, this.value)">
+                    </div>
+                    <div class="beat-markers">
+                        <span class="beat-marker">1</span>
+                        <span class="beat-marker">+</span>
+                        <span class="beat-marker">2</span>
+                        <span class="beat-marker">+</span>
+                        <span class="beat-marker">3</span>
+                        <span class="beat-marker">+</span>
+                        <span class="beat-marker">4</span>
+                        <span class="beat-marker">+</span>
+                    </div>
+                </div>
+            `;
+
+            setTimeout(() => initWaveSurfer(loop, idx), 0);
+
+            return card;
+        }
+
+        function initWaveSurfer(loop, idx) {
+            const container = document.getElementById(`waveform-${idx}`);
+            if (!container) return;
+
+            const ws = WaveSurfer.create({
+                container: container,
+                waveColor: '#8b5cf6',
+                progressColor: '#7c3aed',
+                cursorColor: '#10b981',
+                barWidth: 2,
+                barRadius: 3,
+                cursorWidth: 2,
+                height: 70,
+                barGap: 2
+            });
+
+            ws.load(`sounds/${loop.filename}`);
+
+            ws.on('ready', () => {
+                // Set region visually (create overlay)
+                const loopPercent = ((loop.loopEnd - loop.loopStart) / loop.duration) * 100;
+                const startPercent = (loop.loopStart / loop.duration) * 100;
+
+                const regionEl = document.createElement('div');
+                regionEl.className = 'loop-region';
+                regionEl.style.left = `${startPercent}%`;
+                regionEl.style.width = `${loopPercent}%`;
+                container.parentElement.insertBefore(regionEl, container.nextSibling);
+            });
+
+            ws.on('finish', () => {
+                if (isBPMSynced && currentBPM > 0 && beatPhaseStartTime) {
+                    // Calculate playback rate to sync with BPM
+                    const loopDuration = loop.loopEnd - loop.loopStart;
+                    const beatDuration = 60 / currentBPM;
+                    const beatsInLoop = Math.round(loopDuration / beatDuration);
+
+                    // Ensure at least 1 beat
+                    const actualBeats = Math.max(1, beatsInLoop);
+                    const syncedLoopDuration = actualBeats * beatDuration;
+
+                    // Adjust playback rate to match BPM (with limits)
+                    const playbackRate = loopDuration / syncedLoopDuration;
+                    const clampedRate = Math.max(0.5, Math.min(2, playbackRate));
+                    ws.setPlaybackRate(clampedRate);
+
+                    // Update rate display
+                    const rateDisplay = document.getElementById(`rate-${idx}`);
+                    if (rateDisplay) {
+                        rateDisplay.textContent = `${clampedRate.toFixed(2)}x`;
+                    }
+
+                    // Calculate delay to restart on the correct beat
+                    const barDuration = beatDuration * 4; // 4 beats per bar
+                    const now = performance.now() / 1000;
+                    const elapsed = now - beatPhaseStartTime;
+                    const positionInBar = (elapsed % barDuration) / barDuration;
+
+                    // Get the target position for this loop (from offset slider)
+                    const offsetPercent = loopOffsets[idx] || 0;
+                    const targetPosition = offsetPercent / 100;
+
+                    // Calculate delay needed to reach target position
+                    let delay;
+                    if (targetPosition > positionInBar) {
+                        // Target is later in current bar
+                        delay = (targetPosition - positionInBar) * barDuration;
+                    } else {
+                        // Target is in next bar
+                        delay = (1 - positionInBar + targetPosition) * barDuration;
+                    }
+
+                    console.log(`[LOOP FINISH] Waiting ${(delay * 1000).toFixed(0)}ms to restart at ${offsetPercent}% (current: ${(positionInBar * 100).toFixed(1)}%)`);
+
+                    // Wait for the correct beat position, then restart
+                    setTimeout(() => {
+                        ws.setTime(loop.loopStart);
+                        ws.play();
+                    }, delay * 1000);
+                } else {
+                    // No BPM sync - just loop immediately
+                    ws.setPlaybackRate(1);
+                    ws.setTime(loop.loopStart);
+                    ws.play();
+                }
+            });
+
+            wavesurfers[idx] = { ws, loop };
+        }
+
+        window.playLoop = function(idx) {
+            const item = wavesurfers[idx];
+            if (!item) return;
+
+            const { ws, loop } = item;
+
+            // Stop all others
+            Object.keys(wavesurfers).forEach(key => {
+                if (parseInt(key) !== idx) {
+                    wavesurfers[key].ws.pause();
+                    document.getElementById(`card-${key}`).classList.remove('playing', 'synced');
+                }
+            });
+
+            if (ws.isPlaying()) {
+                ws.pause();
+                document.getElementById(`card-${idx}`).classList.remove('playing', 'synced');
+            } else {
+                ws.setTime(loop.loopStart);
+
+                if (isBPMSynced && currentBPM > 0) {
+                    // Sync to BPM
+                    const loopDuration = loop.loopEnd - loop.loopStart;
+                    const beatDuration = 60 / currentBPM;
+                    const beatsInLoop = Math.round(loopDuration / beatDuration);
+
+                    // Ensure at least 1 beat
+                    const actualBeats = Math.max(1, beatsInLoop);
+                    const syncedLoopDuration = actualBeats * beatDuration;
+                    const playbackRate = loopDuration / syncedLoopDuration;
+
+                    const clampedRate = Math.max(0.5, Math.min(2, playbackRate));
+                    ws.setPlaybackRate(clampedRate);
+                    document.getElementById(`card-${idx}`).classList.add('synced');
+                    document.getElementById(`rate-${idx}`).textContent = `${clampedRate.toFixed(2)}x`;
+
+                    console.log(`[BPM SYNC] Loop: ${loopDuration.toFixed(3)}s, BPM: ${currentBPM}, Beats: ${actualBeats}, Target: ${syncedLoopDuration.toFixed(3)}s, Rate: ${clampedRate.toFixed(3)}x`);
+
+                    // Apply loop offset if set
+                    const offsetPercent = loopOffsets[idx] || 0;
+                    if (offsetPercent > 0 && beatPhaseStartTime) {
+                        const barDuration = beatDuration * 4; // 4 beats per bar
+                        const now = performance.now() / 1000;
+                        const elapsed = now - beatPhaseStartTime;
+                        const positionInBar = (elapsed % barDuration) / barDuration;
+
+                        // Calculate target position (as fraction of bar)
+                        const targetPosition = offsetPercent / 100;
+
+                        // Calculate delay needed to reach target position
+                        let delay;
+                        if (targetPosition > positionInBar) {
+                            // Target is later in current bar
+                            delay = (targetPosition - positionInBar) * barDuration;
+                        } else {
+                            // Target is in next bar
+                            delay = (1 - positionInBar + targetPosition) * barDuration;
+                        }
+
+                        console.log(`[OFFSET] Delaying loop start by ${(delay * 1000).toFixed(0)}ms to reach ${offsetPercent}% position`);
+
+                        // Delay the playback
+                        setTimeout(() => {
+                            ws.play();
+                            document.getElementById(`card-${idx}`).classList.add('playing');
+                        }, delay * 1000);
+                    } else {
+                        ws.play();
+                        document.getElementById(`card-${idx}`).classList.add('playing');
+                    }
+                } else {
+                    ws.setPlaybackRate(1);
+                    ws.play();
+                    document.getElementById(`card-${idx}`).classList.add('playing');
+                }
+            }
+        }
+
+        window.toggleMicrophone = async function() {
+            const btn = document.getElementById('micBtn');
+            const status = document.getElementById('statusInfo');
+            const metrics = document.getElementById('bpmMetrics');
+
+            if (micStream) {
+                // Stop microphone
+                stopMicrophone();
+                btn.textContent = '🎤 Démarrer détection';
+                btn.classList.remove('recording');
+                status.textContent = 'Détection BPM arrêtée';
+                status.classList.remove('active');
+                metrics.classList.remove('active');
+            } else {
+                // Start microphone
+                try {
+                    micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                    audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                    const source = audioContext.createMediaStreamSource(micStream);
+                    analyser = audioContext.createAnalyser();
+                    analyser.fftSize = 4096; // Higher FFT for better frequency resolution
+                    analyser.smoothingTimeConstant = 0.5; // Some smoothing for stability
+                    source.connect(analyser);
+
+                    btn.textContent = '⏹️ Arrêter détection';
+                    btn.classList.add('recording');
+                    status.textContent = 'Détection BPM active...';
+                    status.classList.add('active');
+                    metrics.classList.add('active');
+
+                    startBPMDetection();
+                    startBeatTracker();
+                } catch (err) {
+                    status.textContent = 'Erreur: Impossible d\'accéder au microphone';
+                    status.classList.add('error');
+                    console.error('Microphone error:', err);
+                }
+            }
+        }
+
+        function stopMicrophone() {
+            if (micStream) {
+                micStream.getTracks().forEach(track => track.stop());
+                micStream = null;
+            }
+            if (audioContext) {
+                audioContext.close();
+                audioContext = null;
+            }
+            if (bpmDetectionInterval) {
+                clearInterval(bpmDetectionInterval);
+                bpmDetectionInterval = null;
+            }
+            stopBeatTracker();
+            isBPMSynced = false;
+        }
+
+        function startBPMDetection() {
+            const bufferLength = analyser.frequencyBinCount;
+            const sampleRate = audioContext.sampleRate;
+            const freqData = new Uint8Array(bufferLength);
+            const timeData = new Uint8Array(bufferLength);
+
+            let previousSpectrum = new Float32Array(bufferLength);
+            let spectralFluxHistory = [];
+            let peaks = [];
+            let intervalHistogram = {};
+            let lastPeakTime = 0;
+            const minPeakInterval = 0.25; // 250ms = 240 BPM max
+            let bpmHistory = [];
+            const maxHistory = 10;
+
+            // Calculate frequency bin range for kick drum (50-120 Hz)
+            const kickLowHz = 50;
+            const kickHighHz = 120;
+            const kickLowBin = Math.floor(kickLowHz * bufferLength / (sampleRate / 2));
+            const kickHighBin = Math.floor(kickHighHz * bufferLength / (sampleRate / 2));
+
+            bpmDetectionInterval = setInterval(() => {
+                // Get frequency data for spectral analysis
+                analyser.getByteFrequencyData(freqData);
+                analyser.getByteTimeDomainData(timeData);
+
+                // Calculate overall audio level from time domain
+                let timeSum = 0;
+                for (let i = 0; i < timeData.length; i++) {
+                    timeSum += Math.abs(timeData[i] - 128);
+                }
+                const audioLevel = timeSum / timeData.length;
+                const levelPercent = Math.min(100, (audioLevel / 50) * 100);
+                document.getElementById('audioLevelBar').style.width = levelPercent + '%';
+
+                // Calculate spectral flux in kick drum frequency range (50-120 Hz)
+                let spectralFlux = 0;
+                for (let i = kickLowBin; i <= kickHighBin; i++) {
+                    const current = freqData[i] / 255.0;
+                    const previous = previousSpectrum[i];
+                    // Only count increases in energy (not decreases)
+                    const diff = Math.max(0, current - previous);
+                    spectralFlux += diff;
+                    previousSpectrum[i] = current;
+                }
+
+                // Normalize spectral flux
+                spectralFlux = spectralFlux / (kickHighBin - kickLowBin + 1);
+
+                // Keep history for adaptive threshold
+                spectralFluxHistory.push(spectralFlux);
+                if (spectralFluxHistory.length > 43) { // ~2 seconds at 50ms intervals
+                    spectralFluxHistory.shift();
+                }
+
+                // Calculate adaptive threshold (1.5x mean of recent flux)
+                const meanFlux = spectralFluxHistory.reduce((a, b) => a + b, 0) / spectralFluxHistory.length;
+                const threshold = meanFlux * 1.5;
+
+                const now = performance.now() / 1000;
+
+                // Debug: Log spectral flux periodically
+                if (Math.random() < 0.02) { // 2% of the time
+                    console.log(`[FLUX] spectralFlux: ${spectralFlux.toFixed(4)}, threshold: ${threshold.toFixed(4)}, peaks: ${peaks.length}`);
+                }
+
+                // Detect onset (beat) when flux exceeds threshold
+                if (spectralFlux > threshold && spectralFlux > 0.05 && now - lastPeakTime > minPeakInterval) {
+                    peaks.push(now);
+                    lastPeakTime = now;
+
+                    console.log(`[ONSET] Peak detected! Flux: ${spectralFlux.toFixed(4)}, Total peaks: ${peaks.length}`);
+
+                    // Visual beat pulse
+                    const beatIndicator = document.getElementById('beatIndicator');
+                    beatIndicator.classList.add('pulse');
+                    setTimeout(() => beatIndicator.classList.remove('pulse'), 100);
+
+                    // Sync beat phase on strong peaks
+                    if (spectralFlux > threshold * 1.5 && !beatPhaseStartTime) {
+                        beatPhaseStartTime = now;
+                        console.log('[BEAT PHASE] Initialized on strong onset');
+                    }
+
+                    // Keep only recent peaks (last 5 seconds)
+                    peaks = peaks.filter(t => now - t < 5);
+
+                    // Update peak count
+                    document.getElementById('peakCount').textContent = peaks.length;
+
+                    // Calculate BPM using interval histogram
+                    if (peaks.length >= 6) {
+                        console.log(`[BPM CALC] Starting calculation with ${peaks.length} peaks`);
+
+                        // Build interval histogram
+                        intervalHistogram = {};
+                        for (let i = 1; i < peaks.length; i++) {
+                            const interval = peaks[i] - peaks[i - 1];
+                            const bpm = 60 / interval;
+
+                            // Also check for half-time and double-time
+                            const candidates = [bpm, bpm / 2, bpm * 2];
+
+                            for (const candidate of candidates) {
+                                if (candidate >= 60 && candidate <= 200) {
+                                    const rounded = Math.round(candidate);
+                                    intervalHistogram[rounded] = (intervalHistogram[rounded] || 0) + 1;
+                                }
+                            }
+                        }
+
+                        console.log(`[HISTOGRAM] ${JSON.stringify(intervalHistogram)}`);
+
+                        // Find most common BPM
+                        let maxCount = 0;
+                        let detectedBPM = 120;
+                        for (const [bpm, count] of Object.entries(intervalHistogram)) {
+                            if (count > maxCount) {
+                                maxCount = count;
+                                detectedBPM = parseInt(bpm);
+                            }
+                        }
+
+                        console.log(`[HISTOGRAM] Most common BPM: ${detectedBPM} (count: ${maxCount})`);
+
+                        // Calculate average interval for most common BPM
+                        const targetInterval = 60 / detectedBPM;
+                        const relevantIntervals = [];
+                        for (let i = 1; i < peaks.length; i++) {
+                            const interval = peaks[i] - peaks[i - 1];
+                            if (Math.abs(interval - targetInterval) < 0.15) {
+                                relevantIntervals.push(interval);
+                            }
+                        }
+
+                        console.log(`[INTERVALS] Found ${relevantIntervals.length} relevant intervals for BPM ${detectedBPM}`);
+
+                        if (relevantIntervals.length >= 2) {
+                            const avgInterval = relevantIntervals.reduce((a, b) => a + b) / relevantIntervals.length;
+                            detectedBPM = Math.round(60 / avgInterval);
+
+                            // Update average interval display
+                            document.getElementById('avgInterval').textContent = (avgInterval * 1000).toFixed(0) + 'ms';
+
+                            if (detectedBPM >= 60 && detectedBPM <= 200) {
+                                // Apply exponential moving average for smoothing
+                                if (!isBPMSynced) {
+                                    smoothedBPM = detectedBPM;
+                                } else {
+                                    smoothedBPM = (BPM_SMOOTHING_FACTOR * detectedBPM) + ((1 - BPM_SMOOTHING_FACTOR) * smoothedBPM);
+                                }
+
+                                currentBPM = Math.round(smoothedBPM);
+                                isBPMSynced = true;
+
+                                document.getElementById('bpmValue').textContent = currentBPM;
+                                document.getElementById('lastMeasure').textContent = `${detectedBPM} BPM`;
+
+                                // Update BPM history
+                                bpmHistory.push(detectedBPM);
+                                if (bpmHistory.length > maxHistory) {
+                                    bpmHistory.shift();
+                                }
+
+                                // Update history bars
+                                const historyBars = document.querySelectorAll('.bpm-history-bar');
+                                const minBPM = 60;
+                                const maxBPM = 200;
+                                for (let i = 0; i < historyBars.length; i++) {
+                                    if (i < bpmHistory.length) {
+                                        const bpm = bpmHistory[i];
+                                        const heightPercent = ((bpm - minBPM) / (maxBPM - minBPM)) * 100;
+                                        historyBars[historyBars.length - bpmHistory.length + i].style.height = heightPercent + '%';
+                                    } else {
+                                        historyBars[i].style.height = '0%';
+                                    }
+                                }
+
+                                // Calculate confidence based on interval consistency
+                                const variance = relevantIntervals.reduce((acc, val) => acc + Math.pow(val - avgInterval, 2), 0) / relevantIntervals.length;
+                                const stdDev = Math.sqrt(variance);
+                                const confidencePercent = Math.max(0, Math.min(100, 100 - (stdDev * 200)));
+                                document.getElementById('confidenceBar').style.width = confidencePercent + '%';
+
+                                console.log(`[BPM] Detected: ${detectedBPM}, Smoothed: ${currentBPM}, Confidence: ${confidencePercent.toFixed(1)}%, Histogram: ${JSON.stringify(intervalHistogram)}`);
+                            }
+                        }
+                    }
+                }
+            }, 50);
+        }
+
+        window.setManualBpm = function() {
+            const input = document.getElementById('manualBpm');
+            const bpm = parseInt(input.value);
+
+            if (bpm >= 60 && bpm <= 200) {
+                currentBPM = bpm;
+                smoothedBPM = bpm;
+                isBPMSynced = true;
+                document.getElementById('bpmValue').textContent = bpm;
+
+                const status = document.getElementById('statusInfo');
+                const metrics = document.getElementById('bpmMetrics');
+                status.textContent = `BPM manuel défini: ${bpm}`;
+                status.classList.add('active');
+                status.classList.remove('error');
+                metrics.classList.add('active');
+
+                // Start beat tracker
+                beatPhaseStartTime = performance.now() / 1000;
+                startBeatTracker();
+            } else {
+                alert('BPM doit être entre 60 et 200');
+            }
+        }
+
+        window.updateLoopOffset = function(idx, value) {
+            const beatPosition = parseInt(value);
+            const beatPercent = beatPosition * 12.5; // 0->0%, 1->12.5%, 2->25%, etc.
+            loopOffsets[idx] = beatPercent;
+
+            const beatLabels = [
+                'Temps 1',
+                'Temps 1+',
+                'Temps 2',
+                'Temps 2+',
+                'Temps 3',
+                'Temps 3+',
+                'Temps 4',
+                'Temps 4+'
+            ];
+            document.getElementById(`offset-value-${idx}`).textContent = beatLabels[beatPosition];
+
+            console.log(`[OFFSET] Loop ${idx} offset set to ${beatLabels[beatPosition]} (${beatPercent}%)`);
+        }
+
+        function startBeatTracker() {
+            if (beatTrackerInterval) return;
+
+            beatTrackerInterval = setInterval(() => {
+                if (!isBPMSynced || currentBPM <= 0) return;
+
+                const now = performance.now() / 1000;
+                const beatDuration = 60 / currentBPM;
+                const barDuration = beatDuration * 4; // 4 beats per bar (4/4 time)
+
+                if (!beatPhaseStartTime) {
+                    beatPhaseStartTime = now;
+                }
+
+                // Calculate position in bar
+                const elapsed = now - beatPhaseStartTime;
+                const positionInBar = (elapsed % barDuration) / barDuration;
+                const currentBeatFloat = positionInBar * 4;
+                const currentBeat = Math.floor(currentBeatFloat) + 1;
+
+                // Update beat boxes
+                for (let i = 1; i <= 4; i++) {
+                    const beatBox = document.getElementById(`beat-${i}`);
+                    if (beatBox) {
+                        if (i === currentBeat) {
+                            beatBox.classList.add('active');
+                        } else {
+                            beatBox.classList.remove('active');
+                        }
+                    }
+                }
+            }, 50);
+        }
+
+        function stopBeatTracker() {
+            if (beatTrackerInterval) {
+                clearInterval(beatTrackerInterval);
+                beatTrackerInterval = null;
+            }
+            beatPhaseStartTime = null;
+            // Clear all beat highlights
+            for (let i = 1; i <= 4; i++) {
+                const beatBox = document.getElementById(`beat-${i}`);
+                if (beatBox) {
+                    beatBox.classList.remove('active');
+                }
+            }
+        }
+
+        window.deleteSavedLoop = function(idx) {
+            if (!confirm('Supprimer ce loop sauvegardé?')) return;
+
+            // Stop if playing
+            if (wavesurfers[idx]) {
+                wavesurfers[idx].ws.destroy();
+            }
+
+            // Remove from array
+            savedLoops.splice(idx, 1);
+            localStorage.setItem('oss117-saved-loops', JSON.stringify(savedLoops));
+
+            // Refresh
+            if (savedLoops.length === 0) {
+                document.getElementById('soundboard').innerHTML = '';
+                document.getElementById('emptyState').style.display = 'block';
+            } else {
+                wavesurfers = {};
+                initSoundboard();
+            }
+        }
+
+        window.clearAllSaved = function() {
+            if (!confirm('Supprimer TOUS les loops sauvegardés?')) return;
+
+            Object.values(wavesurfers).forEach(item => item.ws.destroy());
+            wavesurfers = {};
+            savedLoops = [];
+            localStorage.setItem('oss117-saved-loops', JSON.stringify(savedLoops));
+
+            document.getElementById('soundboard').innerHTML = '';
+            document.getElementById('emptyState').style.display = 'block';
+        }
+    </script>
+</body>
+</html>

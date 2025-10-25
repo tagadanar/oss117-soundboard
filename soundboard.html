@@ -1,0 +1,962 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OSS 117: Le Caire, nid d'espions - Soundboard</title>
+    <script src="https://unpkg.com/wavesurfer.js@7"></script>
+    <script src="https://unpkg.com/wavesurfer.js@7/dist/plugins/regions.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1800px;
+            margin: 0 auto;
+        }
+
+        header {
+            text-align: center;
+            color: white;
+            margin-bottom: 20px;
+            padding: 30px 20px;
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 15px;
+            backdrop-filter: blur(10px);
+        }
+
+        h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+        }
+
+        .subtitle {
+            font-size: 1.1em;
+            opacity: 0.9;
+            margin-bottom: 15px;
+        }
+
+        .instructions {
+            font-size: 0.95em;
+            opacity: 0.85;
+            max-width: 700px;
+            margin: 0 auto;
+            line-height: 1.6;
+        }
+
+        .controls-wrapper {
+            background: rgba(255, 255, 255, 0.98);
+            padding: 20px;
+            border-radius: 12px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            backdrop-filter: blur(10px);
+        }
+
+        .search-bar {
+            width: 100%;
+            padding: 15px 20px;
+            font-size: 1.1em;
+            border: 2px solid #667eea;
+            border-radius: 25px;
+            margin-bottom: 15px;
+            outline: none;
+            transition: all 0.3s ease;
+        }
+
+        .search-bar:focus {
+            border-color: #764ba2;
+            box-shadow: 0 0 10px rgba(118, 75, 162, 0.3);
+        }
+
+        .controls {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            flex-wrap: wrap;
+        }
+
+        .control-btn {
+            padding: 12px 24px;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 25px;
+            cursor: pointer;
+            font-size: 0.95em;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
+        }
+
+        .control-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 12px rgba(0, 0, 0, 0.3);
+            background: #764ba2;
+        }
+
+        .control-btn:active {
+            transform: translateY(0);
+        }
+
+        .filter-info {
+            text-align: center;
+            color: #666;
+            margin-top: 10px;
+            font-size: 0.95em;
+        }
+
+        .soundboard {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+            gap: 20px;
+            margin-bottom: 40px;
+            margin-top: 10px;
+        }
+
+        .sound-card {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            transition: all 0.3s ease;
+            position: relative;
+            border: 3px solid transparent;
+        }
+
+        .sound-card:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);
+        }
+
+        .sound-card.playing {
+            border-color: #667eea;
+            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.3);
+        }
+
+        .sound-card.looping {
+            border-color: #ff6b6b;
+            box-shadow: 0 6px 20px rgba(255, 107, 107, 0.3);
+        }
+
+        .sound-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: start;
+            margin-bottom: 15px;
+        }
+
+        .sound-number {
+            background: #667eea;
+            color: white;
+            min-width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 0.9em;
+            flex-shrink: 0;
+        }
+
+        .sound-title {
+            flex: 1;
+            font-size: 0.95em;
+            line-height: 1.4;
+            padding: 0 15px;
+            color: #333;
+        }
+
+        .status-icon {
+            font-size: 1.2em;
+            opacity: 0;
+            transition: opacity 0.2s;
+        }
+
+        .sound-card.playing .status-icon.play-icon,
+        .sound-card.looping .status-icon.loop-icon {
+            opacity: 1;
+        }
+
+        .waveform-container {
+            margin: 15px 0;
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 15px;
+            cursor: pointer;
+            position: relative;
+            min-height: 100px;
+            border: 2px solid transparent;
+            transition: all 0.2s ease;
+        }
+
+        .waveform-container:hover {
+            background: #f0f2f5;
+            border-color: #667eea;
+        }
+
+        .waveform-container.selecting {
+            background: #e8f4f8;
+            border-color: #ff6b6b;
+        }
+
+        .waveform {
+            height: 70px;
+        }
+
+        .time-display {
+            font-size: 0.85em;
+            color: #666;
+            text-align: center;
+            margin-top: 8px;
+            font-family: 'Courier New', monospace;
+        }
+
+        .sound-meta {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 0.8em;
+            color: #666;
+            margin-top: 12px;
+            padding-top: 12px;
+            border-top: 1px solid #eee;
+        }
+
+        .loop-indicator {
+            background: linear-gradient(135deg, #ff6b6b, #ff8787);
+            color: white;
+            padding: 4px 12px;
+            border-radius: 15px;
+            font-size: 0.75em;
+            font-weight: bold;
+            display: none;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .sound-card.looping .loop-indicator {
+            display: flex;
+        }
+
+        .save-btn {
+            background: linear-gradient(135deg, #10b981, #059669);
+            color: white;
+            border: none;
+            padding: 6px 16px;
+            border-radius: 20px;
+            font-size: 0.8em;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: none;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .sound-card.looping .save-btn {
+            display: flex;
+        }
+
+        .save-btn:hover {
+            transform: scale(1.05);
+            box-shadow: 0 4px 8px rgba(16, 185, 129, 0.3);
+        }
+
+        .save-btn.saved {
+            background: linear-gradient(135deg, #8b5cf6, #7c3aed);
+        }
+
+        .nav-link {
+            position: fixed;
+            bottom: 30px;
+            right: 30px;
+            background: linear-gradient(135deg, #8b5cf6, #7c3aed);
+            color: white;
+            padding: 15px 30px;
+            border-radius: 30px;
+            text-decoration: none;
+            font-weight: 600;
+            font-size: 1em;
+            box-shadow: 0 6px 20px rgba(139, 92, 246, 0.4);
+            transition: all 0.3s ease;
+            z-index: 999;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .nav-link:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 10px 30px rgba(139, 92, 246, 0.6);
+        }
+
+        .saved-count {
+            background: white;
+            color: #8b5cf6;
+            padding: 3px 10px;
+            border-radius: 15px;
+            font-size: 0.9em;
+        }
+
+        .loading {
+            text-align: center;
+            color: white;
+            font-size: 1.2em;
+            padding: 40px;
+        }
+
+        .no-results {
+            text-align: center;
+            color: white;
+            font-size: 1.2em;
+            padding: 40px;
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 10px;
+            margin: 20px 0;
+        }
+
+        footer {
+            text-align: center;
+            color: white;
+            padding: 20px;
+            opacity: 0.9;
+        }
+
+        .stats {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 15px;
+            border-radius: 10px;
+            display: inline-block;
+            margin-bottom: 15px;
+        }
+
+        .gesture-help {
+            font-size: 0.9em;
+            opacity: 0.85;
+            line-height: 1.6;
+        }
+
+        @media (max-width: 768px) {
+            h1 {
+                font-size: 1.8em;
+            }
+
+            .soundboard {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        /* WaveSurfer region styling */
+        .wavesurfer-region {
+            opacity: 0.4 !important;
+        }
+
+        .wavesurfer-handle {
+            background: rgba(255, 107, 107, 0.9) !important;
+            width: 10px !important;
+        }
+
+        /* Tooltip */
+        .tooltip {
+            position: fixed;
+            background: rgba(0, 0, 0, 0.8);
+            color: white;
+            padding: 8px 12px;
+            border-radius: 6px;
+            font-size: 0.85em;
+            pointer-events: none;
+            z-index: 1000;
+            display: none;
+            white-space: nowrap;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🎬 OSS 117: Le Caire, nid d'espions</h1>
+            <p class="subtitle">Soundboard Interactif</p>
+            <div class="instructions">
+                <strong>🖱️ Click</strong> sur la waveform pour jouer à cet endroit<br>
+                <strong>🖱️ Drag</strong> sur la waveform pour créer une boucle et la jouer<br>
+                <strong>🖱️ Drag les bords</strong> d'une région pour ajuster la boucle
+            </div>
+        </header>
+
+        <div class="controls-wrapper">
+            <input type="text" class="search-bar" id="searchInput" placeholder="🔍 Rechercher une réplique...">
+
+            <div class="controls">
+                <button class="control-btn" onclick="stopAll()">⏹️ Arrêter tout</button>
+                <button class="control-btn" onclick="clearAllLoops()">❌ Effacer toutes les boucles</button>
+                <button class="control-btn" onclick="playRandom()">🎲 Aléatoire</button>
+                <button class="control-btn" onclick="sortByDuration()">⏱️ Par durée</button>
+                <button class="control-btn" onclick="sortByIndex()">🔢 Par ordre</button>
+            </div>
+
+            <div class="filter-info" id="filterInfo"></div>
+        </div>
+
+        <div id="loading" class="loading">Chargement des sons et waveforms...</div>
+        <div id="no-results" class="no-results" style="display: none;">
+            Aucune réplique trouvée pour cette recherche.
+        </div>
+        <div class="soundboard" id="soundboard">
+            <!-- Sound cards will be generated here -->
+        </div>
+
+        <footer>
+            <div class="stats">
+                <p><strong id="displayedSounds">0</strong> / <strong id="totalSounds">0</strong> répliques • Durée totale: <strong id="totalDuration">0:00</strong></p>
+                <p>Taille totale: <strong id="totalSize">0</strong></p>
+            </div>
+            <div class="gesture-help">
+                <p>💡 <strong>Astuce:</strong> Les cartes bleues jouent, les cartes rouges sont en boucle</p>
+                <p>⌨️ <strong>Raccourcis:</strong> ESC pour arrêter • ESPACE pour aléatoire</p>
+            </div>
+        </footer>
+    </div>
+
+    <div class="tooltip" id="tooltip"></div>
+
+    <a href="final-soundboard.html" class="nav-link">
+        🎵 Final Soundboard
+        <span class="saved-count" id="savedCount">0</span>
+    </a>
+
+    <script type="module">
+        import WaveSurfer from 'https://unpkg.com/wavesurfer.js@7/dist/wavesurfer.esm.js'
+        import RegionsPlugin from 'https://unpkg.com/wavesurfer.js@7/dist/plugins/regions.esm.js'
+
+        let allSounds = [];
+        let filteredSounds = [];
+        let wavesurfers = {};
+        let currentPlaying = null;
+        let savedLoops = JSON.parse(localStorage.getItem('oss117-saved-loops') || '[]');
+
+        // Load metadata from JSON
+        fetch('sounds/metadata.json')
+            .then(response => response.json())
+            .then(data => {
+                allSounds = data;
+                filteredSounds = [...allSounds];
+                initSoundboard();
+                updateStats();
+                updateSavedCount();
+                document.getElementById('loading').style.display = 'none';
+            })
+            .catch(error => {
+                console.error('Error loading metadata:', error);
+                document.getElementById('loading').innerHTML = '❌ Erreur de chargement des métadonnées';
+            });
+
+        function formatDuration(seconds) {
+            if (!seconds) return '0:00';
+            const mins = Math.floor(seconds / 60);
+            const secs = Math.floor(seconds % 60);
+            return `${mins}:${secs.toString().padStart(2, '0')}`;
+        }
+
+        function formatSize(bytes) {
+            if (bytes < 1024) return bytes + ' B';
+            if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+            return (bytes / (1024 * 1024)).toFixed(2) + ' MB';
+        }
+
+        function cleanTitle(title) {
+            return title.replace(/^\d+/, '').trim();
+        }
+
+        function initSoundboard() {
+            const soundboard = document.getElementById('soundboard');
+            soundboard.innerHTML = '';
+
+            // Limit initial render for performance
+            const soundsToRender = filteredSounds.slice(0, 50);
+
+            soundsToRender.forEach((sound) => {
+                const card = createSoundCard(sound);
+                soundboard.appendChild(card);
+            });
+
+            // Lazy load remaining cards
+            if (filteredSounds.length > 50) {
+                setTimeout(() => {
+                    for (let i = 50; i < filteredSounds.length; i++) {
+                        const card = createSoundCard(filteredSounds[i]);
+                        soundboard.appendChild(card);
+                    }
+                }, 100);
+            }
+
+            updateFilterInfo();
+        }
+
+        function createSoundCard(sound) {
+            const card = document.createElement('div');
+            card.className = 'sound-card';
+            card.dataset.index = sound.index;
+            card.id = `card-${sound.index}`;
+
+            card.innerHTML = `
+                <div class="sound-header">
+                    <div class="sound-number">${sound.index}</div>
+                    <div class="sound-title">${cleanTitle(sound.title)}</div>
+                    <div class="status-icon play-icon">▶️</div>
+                    <div class="status-icon loop-icon">🔁</div>
+                </div>
+                <div class="waveform-container" id="wave-container-${sound.index}">
+                    <div class="waveform" id="waveform-${sound.index}"></div>
+                    <div class="time-display" id="time-${sound.index}">0:00 / ${formatDuration(sound.duration)}</div>
+                </div>
+                <div class="sound-meta">
+                    <span>⏱️ ${formatDuration(sound.duration)}</span>
+                    <div class="loop-indicator">🔁 LOOP</div>
+                    <button class="save-btn" onclick="saveLoop(${sound.index})" id="save-btn-${sound.index}">
+                        💾 Sauvegarder
+                    </button>
+                    <span>📦 ${formatSize(sound.size)}</span>
+                </div>
+            `;
+
+            // Initialize WaveSurfer after card is added to DOM
+            setTimeout(() => initWaveSurfer(sound), 0);
+
+            return card;
+        }
+
+        function initWaveSurfer(sound) {
+            const container = document.getElementById(`waveform-${sound.index}`);
+            if (!container) return;
+
+            const regions = RegionsPlugin.create();
+
+            const ws = WaveSurfer.create({
+                container: container,
+                waveColor: '#667eea',
+                progressColor: '#764ba2',
+                cursorColor: '#ff6b6b',
+                barWidth: 2,
+                barRadius: 3,
+                cursorWidth: 2,
+                height: 70,
+                barGap: 2,
+                plugins: [regions],
+                interact: true,
+                hideScrollbar: true,
+                normalize: true
+            });
+
+            ws.load(`sounds/${sound.filename}`);
+
+            let isCreatingRegion = false;
+            let regionStartTime = 0;
+
+            // Update time display
+            ws.on('timeupdate', (currentTime) => {
+                const timeDisplay = document.getElementById(`time-${sound.index}`);
+                if (timeDisplay) {
+                    timeDisplay.textContent = `${formatDuration(currentTime)} / ${formatDuration(sound.duration)}`;
+                }
+
+                // Check for loop
+                if (ws.activeRegion && ws.getCurrentTime() >= ws.activeRegion.end) {
+                    ws.setTime(ws.activeRegion.start);
+                }
+            });
+
+            // Handle click to play/seek
+            ws.on('click', (relativeX) => {
+                // Small delay to check if this was part of a drag operation
+                setTimeout(() => {
+                    if (!isCreatingRegion && !regionCreationStart) {
+                        // Always stop other sounds first
+                        if (currentPlaying && currentPlaying !== sound.index) {
+                            stopOtherSounds(sound.index);
+                        }
+
+                        // Don't clear the region on click - just play from clicked position
+                        // The loop will continue if a region exists
+                        ws.play();
+                        currentPlaying = sound.index;
+
+                        // Update visual state
+                        if (ws.activeRegion) {
+                            document.getElementById(`card-${sound.index}`).classList.add('looping');
+                        } else {
+                            document.getElementById(`card-${sound.index}`).classList.add('playing');
+                        }
+
+                        console.log('Click play triggered at', relativeX);
+                    }
+                }, 10);
+            });
+
+            // Handle drag to create region
+            ws.on('interaction', () => {
+                const waveContainer = document.getElementById(`wave-container-${sound.index}`);
+
+                if (!ws.activeRegion) {
+                    waveContainer.classList.add('selecting');
+                }
+            });
+
+            // Region creation on drag
+            let regionCreationStart = null;
+            let dragStartX = 0;
+
+            container.addEventListener('mousedown', (e) => {
+                if (e.button !== 0) return; // Left click only
+
+                e.preventDefault();
+                isCreatingRegion = false;
+                dragStartX = e.clientX;
+
+                // Always allow region creation, clear existing if present
+                if (ws.activeRegion) {
+                    regions.clearRegions();
+                    ws.activeRegion = null;
+                    document.getElementById(`card-${sound.index}`).classList.remove('looping');
+                }
+
+                const rect = container.getBoundingClientRect();
+                const offsetX = e.clientX - rect.left;
+                regionCreationStart = {
+                    x: offsetX,
+                    time: (offsetX / rect.width) * ws.getDuration()
+                };
+
+                document.getElementById(`wave-container-${sound.index}`).classList.add('selecting');
+            });
+
+            container.addEventListener('mousemove', (e) => {
+                if (!regionCreationStart) return;
+
+                e.preventDefault();
+                const dragDistance = Math.abs(e.clientX - dragStartX);
+
+                // Consider it a drag if moved more than 5 pixels
+                if (dragDistance > 5) {
+                    isCreatingRegion = true;
+                }
+            });
+
+            container.addEventListener('mouseup', (e) => {
+                if (!regionCreationStart) return;
+
+                e.preventDefault();
+                document.getElementById(`wave-container-${sound.index}`).classList.remove('selecting');
+
+                const rect = container.getBoundingClientRect();
+                const offsetX = e.clientX - rect.left;
+                const endTime = (offsetX / rect.width) * ws.getDuration();
+                const startTime = regionCreationStart.time;
+
+                // Check if this was a drag (not a click)
+                if (isCreatingRegion && Math.abs(endTime - startTime) > 0.1) {
+                    // Create region
+                    regions.clearRegions();
+
+                    const regionStart = Math.min(startTime, endTime);
+                    const regionEnd = Math.max(startTime, endTime);
+
+                    // Stop other sounds
+                    if (currentPlaying && currentPlaying !== sound.index) {
+                        stopOtherSounds(sound.index);
+                    }
+
+                    ws.activeRegion = regions.addRegion({
+                        start: regionStart,
+                        end: regionEnd,
+                        color: 'rgba(255, 107, 107, 0.4)',
+                        drag: true,
+                        resize: true
+                    });
+
+                    // Start playing the loop
+                    ws.setTime(regionStart);
+                    ws.play();
+                    currentPlaying = sound.index;
+
+                    document.getElementById(`card-${sound.index}`).classList.remove('playing');
+                    document.getElementById(`card-${sound.index}`).classList.add('looping');
+
+                    // Double-click on region to remove it
+                    ws.activeRegion.on('dblclick', () => {
+                        regions.clearRegions();
+                        ws.activeRegion = null;
+                        document.getElementById(`card-${sound.index}`).classList.remove('looping');
+                        document.getElementById(`card-${sound.index}`).classList.add('playing');
+                    });
+
+                    // Update region bounds on drag
+                    ws.activeRegion.on('update-end', () => {
+                        ws.setTime(ws.activeRegion.start);
+                    });
+
+                    console.log(`Loop created: ${regionStart.toFixed(2)}s - ${regionEnd.toFixed(2)}s`);
+                } else if (!isCreatingRegion) {
+                    // This was a click, not a drag - handled by ws.on('click')
+                    console.log('Click detected, not creating region');
+                }
+
+                regionCreationStart = null;
+                isCreatingRegion = false;
+            });
+
+            container.addEventListener('mouseleave', () => {
+                if (regionCreationStart) {
+                    regionCreationStart = null;
+                    isCreatingRegion = false;
+                    document.getElementById(`wave-container-${sound.index}`).classList.remove('selecting');
+                }
+            });
+
+            // Handle finish
+            ws.on('finish', () => {
+                if (ws.activeRegion) {
+                    // Loop back to start
+                    ws.setTime(ws.activeRegion.start);
+                    ws.play();
+                } else {
+                    // Stop playing
+                    document.getElementById(`card-${sound.index}`).classList.remove('playing');
+                    currentPlaying = null;
+                }
+            });
+
+            // Store reference
+            wavesurfers[sound.index] = ws;
+
+            // Check if this loop is already saved
+            updateSaveButtonState(sound.index);
+        }
+
+        function updateSaveButtonState(index) {
+            const saveBtn = document.getElementById(`save-btn-${index}`);
+            if (!saveBtn) return;
+
+            const isSaved = savedLoops.some(loop => loop.index === index);
+            if (isSaved) {
+                saveBtn.textContent = '✓ Sauvegardé';
+                saveBtn.classList.add('saved');
+            } else {
+                saveBtn.textContent = '💾 Sauvegarder';
+                saveBtn.classList.remove('saved');
+            }
+        }
+
+        window.saveLoop = function(index) {
+            const ws = wavesurfers[index];
+            if (!ws || !ws.activeRegion) {
+                alert('Créez d\'abord une boucle en glissant sur la waveform!');
+                return;
+            }
+
+            const sound = allSounds.find(s => s.index === index);
+            if (!sound) return;
+
+            // Check if already saved
+            const existingIndex = savedLoops.findIndex(loop => loop.index === index);
+
+            const loopData = {
+                index: sound.index,
+                title: cleanTitle(sound.title),
+                filename: sound.filename,
+                loopStart: ws.activeRegion.start,
+                loopEnd: ws.activeRegion.end,
+                duration: sound.duration,
+                size: sound.size,
+                savedAt: Date.now()
+            };
+
+            if (existingIndex >= 0) {
+                // Update existing
+                savedLoops[existingIndex] = loopData;
+            } else {
+                // Add new
+                savedLoops.push(loopData);
+            }
+
+            // Save to localStorage
+            localStorage.setItem('oss117-saved-loops', JSON.stringify(savedLoops));
+
+            // Update UI
+            updateSaveButtonState(index);
+            updateSavedCount();
+
+            // Show feedback
+            const btn = document.getElementById(`save-btn-${index}`);
+            btn.textContent = '✓ Sauvegardé!';
+            setTimeout(() => updateSaveButtonState(index), 1500);
+        }
+
+        function updateSavedCount() {
+            const countEl = document.getElementById('savedCount');
+            if (countEl) {
+                countEl.textContent = savedLoops.length;
+            }
+        }
+
+        function stopOtherSounds(exceptIndex) {
+            Object.keys(wavesurfers).forEach(index => {
+                if (parseInt(index) !== exceptIndex) {
+                    const ws = wavesurfers[index];
+                    if (ws) {
+                        // Stop playback
+                        if (ws.isPlaying()) {
+                            ws.pause();
+                        }
+                        // Remove visual states
+                        const card = document.getElementById(`card-${index}`);
+                        if (card) {
+                            card.classList.remove('playing', 'looping');
+                        }
+                    }
+                }
+            });
+        }
+
+        window.stopAll = function() {
+            Object.values(wavesurfers).forEach(ws => {
+                if (ws && ws.isPlaying()) {
+                    ws.pause();
+                    ws.setTime(0);
+                }
+            });
+
+            document.querySelectorAll('.sound-card').forEach(card => {
+                card.classList.remove('playing', 'looping');
+            });
+
+            currentPlaying = null;
+        }
+
+        window.clearAllLoops = function() {
+            Object.values(wavesurfers).forEach(ws => {
+                if (ws && ws.plugins && ws.plugins[0]) {
+                    ws.plugins[0].clearRegions();
+                    ws.activeRegion = null;
+                }
+            });
+
+            document.querySelectorAll('.sound-card').forEach(card => {
+                card.classList.remove('looping');
+            });
+        }
+
+        window.playRandom = function() {
+            if (filteredSounds.length === 0) return;
+
+            const randomSound = filteredSounds[Math.floor(Math.random() * filteredSounds.length)];
+            const ws = wavesurfers[randomSound.index];
+            const card = document.getElementById(`card-${randomSound.index}`);
+
+            if (card && ws) {
+                card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                setTimeout(() => {
+                    stopOtherSounds(randomSound.index);
+                    ws.play();
+                    currentPlaying = randomSound.index;
+                    card.classList.add('playing');
+                }, 500);
+            }
+        }
+
+        window.sortByDuration = function() {
+            filteredSounds.sort((a, b) => (b.duration || 0) - (a.duration || 0));
+            reinitSoundboard();
+        }
+
+        window.sortByIndex = function() {
+            filteredSounds.sort((a, b) => a.index - b.index);
+            reinitSoundboard();
+        }
+
+        function reinitSoundboard() {
+            // Clean up wavesurfers before recreating
+            Object.values(wavesurfers).forEach(ws => {
+                if (ws) ws.destroy();
+            });
+            wavesurfers = {};
+            currentPlaying = null;
+
+            initSoundboard();
+        }
+
+        function updateStats() {
+            const totalSounds = allSounds.length;
+            const totalDuration = allSounds.reduce((sum, s) => sum + (s.duration || 0), 0);
+            const totalSize = allSounds.reduce((sum, s) => sum + (s.size || 0), 0);
+
+            document.getElementById('totalSounds').textContent = totalSounds;
+            document.getElementById('totalDuration').textContent = formatDuration(totalDuration);
+            document.getElementById('totalSize').textContent = formatSize(totalSize);
+        }
+
+        function updateFilterInfo() {
+            const noResults = document.getElementById('no-results');
+            const soundboard = document.getElementById('soundboard');
+
+            document.getElementById('displayedSounds').textContent = filteredSounds.length;
+
+            if (filteredSounds.length === 0) {
+                noResults.style.display = 'block';
+                soundboard.style.display = 'none';
+            } else {
+                noResults.style.display = 'none';
+                soundboard.style.display = 'grid';
+            }
+
+            const searchTerm = document.getElementById('searchInput').value;
+            const info = document.getElementById('filterInfo');
+            if (searchTerm) {
+                info.textContent = `Filtré par: "${searchTerm}"`;
+            } else {
+                info.textContent = '';
+            }
+        }
+
+        // Search functionality
+        document.getElementById('searchInput').addEventListener('input', (e) => {
+            const searchTerm = e.target.value.toLowerCase();
+
+            if (!searchTerm) {
+                filteredSounds = [...allSounds];
+            } else {
+                filteredSounds = allSounds.filter(sound =>
+                    cleanTitle(sound.title).toLowerCase().includes(searchTerm)
+                );
+            }
+
+            reinitSoundboard();
+        });
+
+        // Keyboard shortcuts
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                stopAll();
+            } else if (e.key === ' ' && e.target.tagName !== 'INPUT') {
+                e.preventDefault();
+                playRandom();
+            }
+        });
+    </script>
+</body>
+</html>
