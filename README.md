@@ -31,8 +31,8 @@ The soundboard displays all quotes with:
 
 1. **Clone the repository**
    ```bash
-   git clone <repository-url>
-   cd osssoundboard
+   git clone https://github.com/tagadanar/oss117-soundboard.git
+   cd oss117-soundboard
    ```
 
 2. **Create a virtual environment** (recommended)
