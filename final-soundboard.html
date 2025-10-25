@@ -275,6 +275,11 @@
             cursor: pointer;
         }
 
+        .offset-slider:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+        }
+
         .offset-slider::-webkit-slider-thumb {
             -webkit-appearance: none;
             appearance: none;
@@ -337,6 +342,29 @@
             font-size: 0.85em;
             color: #8b5cf6;
             font-weight: bold;
+        }
+
+        .offset-toggle {
+            background: #e5e7eb;
+            color: #666;
+            border: 2px solid #d1d5db;
+            padding: 4px 12px;
+            border-radius: 15px;
+            font-size: 0.75em;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            user-select: none;
+        }
+
+        .offset-toggle:hover {
+            background: #d1d5db;
+        }
+
+        .offset-toggle.active {
+            background: linear-gradient(135deg, #10b981, #059669);
+            color: white;
+            border-color: #10b981;
         }
 
         .bpm-display {
@@ -944,6 +972,7 @@
         let beatTrackerInterval = null;
         let beatPhaseStartTime = null;
         let loopOffsets = {}; // Store offset percentage for each loop
+        let offsetEnabled = {}; // Track if offset is enabled for each loop
         const BPM_SMOOTHING_FACTOR = 0.2; // Lower = more smoothing (0.2 = aggressive smoothing)
 
         // Sequencer state
@@ -1127,8 +1156,6 @@
                 if (sequencerGrid[trackIdx][currentStep]) {
                     const item = wavesurfers[trackIdx];
                     if (item) {
-                        const {ws, loop} = item;
-
                         // Trigger playing animation
                         const cell = document.querySelector(`.step-cell[data-track="${trackIdx}"][data-step="${currentStep}"]`);
                         if (cell) {
@@ -1136,10 +1163,8 @@
                             setTimeout(() => cell.classList.remove('playing'), 300);
                         }
 
-                        // Play the sound
-                        ws.stop();
-                        ws.setTime(loop.loopStart);
-                        ws.play();
+                        // Play the sound using playLoop with fromSequencer flag
+                        playLoop(parseInt(trackIdx), true);
                         console.log(`[SEQ] Playing track ${trackIdx} at step ${currentStep}`);
                     }
                 }
@@ -1191,13 +1216,17 @@
                 </div>
                 <div class="loop-offset-control">
                     <div class="offset-header">
-                        <span class="offset-label">Départ sur:</span>
+                        <span class="offset-label">Offset Manuel:</span>
+                        <button class="offset-toggle" id="offset-toggle-${idx}" onclick="toggleOffsetEnabled(${idx})">
+                            OFF
+                        </button>
                         <span class="offset-value" id="offset-value-${idx}">Temps 1</span>
                     </div>
                     <div class="offset-slider-container">
                         <input type="range" class="offset-slider" id="offset-${idx}"
                                min="0" max="7" value="0" step="1"
-                               oninput="updateLoopOffset(${idx}, this.value)">
+                               oninput="updateLoopOffset(${idx}, this.value)"
+                               disabled>
                     </div>
                     <div class="beat-markers">
                         <span class="beat-marker">1</span>
@@ -1269,33 +1298,42 @@
                         rateDisplay.textContent = `${clampedRate.toFixed(2)}x`;
                     }
 
-                    // Calculate delay to restart on the correct beat
-                    const barDuration = beatDuration * 4; // 4 beats per bar
-                    const now = performance.now() / 1000;
-                    const elapsed = now - beatPhaseStartTime;
-                    const positionInBar = (elapsed % barDuration) / barDuration;
-
-                    // Get the target position for this loop (from offset slider)
+                    // Only apply offset delay if offset is enabled
                     const offsetPercent = loopOffsets[idx] || 0;
-                    const targetPosition = offsetPercent / 100;
+                    const shouldUseOffset = offsetEnabled[idx] && offsetPercent > 0;
 
-                    // Calculate delay needed to reach target position
-                    let delay;
-                    if (targetPosition > positionInBar) {
-                        // Target is later in current bar
-                        delay = (targetPosition - positionInBar) * barDuration;
+                    if (shouldUseOffset) {
+                        // Calculate delay to restart on the correct beat
+                        const barDuration = beatDuration * 4; // 4 beats per bar
+                        const now = performance.now() / 1000;
+                        const elapsed = now - beatPhaseStartTime;
+                        const positionInBar = (elapsed % barDuration) / barDuration;
+
+                        // Get the target position for this loop (from offset slider)
+                        const targetPosition = offsetPercent / 100;
+
+                        // Calculate delay needed to reach target position
+                        let delay;
+                        if (targetPosition > positionInBar) {
+                            // Target is later in current bar
+                            delay = (targetPosition - positionInBar) * barDuration;
+                        } else {
+                            // Target is in next bar
+                            delay = (1 - positionInBar + targetPosition) * barDuration;
+                        }
+
+                        console.log(`[LOOP FINISH] Waiting ${(delay * 1000).toFixed(0)}ms to restart at ${offsetPercent}% (current: ${(positionInBar * 100).toFixed(1)}%)`);
+
+                        // Wait for the correct beat position, then restart
+                        setTimeout(() => {
+                            ws.setTime(loop.loopStart);
+                            ws.play();
+                        }, delay * 1000);
                     } else {
-                        // Target is in next bar
-                        delay = (1 - positionInBar + targetPosition) * barDuration;
-                    }
-
-                    console.log(`[LOOP FINISH] Waiting ${(delay * 1000).toFixed(0)}ms to restart at ${offsetPercent}% (current: ${(positionInBar * 100).toFixed(1)}%)`);
-
-                    // Wait for the correct beat position, then restart
-                    setTimeout(() => {
+                        // No offset - restart immediately
                         ws.setTime(loop.loopStart);
                         ws.play();
-                    }, delay * 1000);
+                    }
                 } else {
                     // No BPM sync - just loop immediately
                     ws.setPlaybackRate(1);
@@ -1307,21 +1345,23 @@
             wavesurfers[idx] = { ws, loop };
         }
 
-        window.playLoop = function(idx) {
+        window.playLoop = function(idx, fromSequencer = false) {
             const item = wavesurfers[idx];
             if (!item) return;
 
             const { ws, loop } = item;
 
-            // Stop all others
-            Object.keys(wavesurfers).forEach(key => {
-                if (parseInt(key) !== idx) {
-                    wavesurfers[key].ws.pause();
-                    document.getElementById(`card-${key}`).classList.remove('playing', 'synced');
-                }
-            });
+            // Stop all others (only when manually playing, not from sequencer)
+            if (!fromSequencer) {
+                Object.keys(wavesurfers).forEach(key => {
+                    if (parseInt(key) !== idx) {
+                        wavesurfers[key].ws.pause();
+                        document.getElementById(`card-${key}`).classList.remove('playing', 'synced');
+                    }
+                });
+            }
 
-            if (ws.isPlaying()) {
+            if (ws.isPlaying() && !fromSequencer) {
                 ws.pause();
                 document.getElementById(`card-${idx}`).classList.remove('playing', 'synced');
             } else {
@@ -1345,9 +1385,11 @@
 
                     console.log(`[BPM SYNC] Loop: ${loopDuration.toFixed(3)}s, BPM: ${currentBPM}, Beats: ${actualBeats}, Target: ${syncedLoopDuration.toFixed(3)}s, Rate: ${clampedRate.toFixed(3)}x`);
 
-                    // Apply loop offset if set
+                    // Apply loop offset ONLY if enabled and NOT from sequencer
                     const offsetPercent = loopOffsets[idx] || 0;
-                    if (offsetPercent > 0 && beatPhaseStartTime) {
+                    const shouldUseOffset = !fromSequencer && offsetEnabled[idx] && offsetPercent > 0 && beatPhaseStartTime;
+
+                    if (shouldUseOffset) {
                         const barDuration = beatDuration * 4; // 4 beats per bar
                         const now = performance.now() / 1000;
                         const elapsed = now - beatPhaseStartTime;
@@ -1657,6 +1699,24 @@
             } else {
                 alert('BPM doit être entre 60 et 200');
             }
+        }
+
+        window.toggleOffsetEnabled = function(idx) {
+            offsetEnabled[idx] = !offsetEnabled[idx];
+            const toggle = document.getElementById(`offset-toggle-${idx}`);
+            const slider = document.getElementById(`offset-${idx}`);
+
+            if (offsetEnabled[idx]) {
+                toggle.textContent = 'ON';
+                toggle.classList.add('active');
+                slider.disabled = false;
+            } else {
+                toggle.textContent = 'OFF';
+                toggle.classList.remove('active');
+                slider.disabled = true;
+            }
+
+            console.log(`[OFFSET] Loop ${idx} offset ${offsetEnabled[idx] ? 'enabled' : 'disabled'}`);
         }
 
         window.updateLoopOffset = function(idx, value) {
